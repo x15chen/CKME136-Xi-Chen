@@ -1,0 +1,141 @@
+#Data import
+data1<-read.csv("2009HMDALAR - National.csv", header = FALSE, col.names = c("AsOfYear", "RespondentID","AgencyCode","LoanType","PropertyType","LoanPurpose","Occupancy","LoanAmount000s","Preapproval","ActionType","MSA/MD","StateCode","CountyCode","CensusTractNumber","ApplicantEthnicity","CoApplicantEthnicity","ApplicantRace1","ApplicantRace2","ApplicantRace3","ApplicantRace4","ApplicantRace5","CoApplicantRace1","CoApplicantRace2","CoApplicantRace3","CoApplicantRace4","CoApplicantRace5","ApplicantSex","CoApplicantSex","ApplicantIncome000s","PurchaserType","DenialReason1","DenialReason2","DenialReason3","rateSpread","HOEPAStatus","LienStatus","EditStatus","SequenceNumber","Population","MinorityPopulationPercent","HUDMedianFamilyIncome","TractToMSA/MDIncomePercent","NumberOfOwner-occupiedUnits","NumberOf1to4FamilyUnits","ApplicationDateIndicator"), stringsAsFactors = F)
+data<-data.frame(lapply(data1[,-c(1,2,14,38)], factor))
+data$AsOfYear<-data1$AsOfYear
+data$RespondentID<-as.integer(data1$RespondentID)
+data$SequenceNumber<-data1$SequenceNumber
+data$CensusTractNumber<-as.integer(data1$CensusTractNumber)
+data$LoanAmount000s<-as.integer(data$LoanAmount000s)
+data$ApplicantIncome000s<-as.integer(data$ApplicantIncome000s)
+data$rateSpread<-as.numeric(data$rateSpread)
+data$Population<-as.integer(data$Population)
+data$MinorityPopulationPercent<-as.numeric(data$MinorityPopulationPercent)
+data$HUDMedianFamilyIncome<-as.integer(data$HUDMedianFamilyIncome)
+data$TractToMSA.MDIncomePercent<-as.numeric(data$TractToMSA.MDIncomePercent)
+data$NumberOf1to4FamilyUnits<-as.integer(data$NumberOf1to4FamilyUnits)
+data$NumberOfOwner.occupiedUnits<-as.integer(data$NumberOfOwner.occupiedUnits)
+
+
+#Data exploration
+str(data)
+summary(data)
+#upon review of categorical attributes, I will remove the records without statecode and countycode. I'll also only keep the first race attribute since lots of applicants and co-applicants do not have multiple races.
+data<-data[!(is.na(data$StateCode)) & !(is.na(data$CountyCode)),]
+data <- data[, -c(15,16,17,18,20,21,22,23)]
+
+boxplot.stats(data$ApplicantIncome000s)
+#value 5536 seems to be filler value. I will exclude it from the analysis.
+data<-data[!(data$ApplicantIncome000s==5536),]
+boxplot.stats(data$LoanAmount000s)
+#even though a lot of values are shown as outliners, they seem to be legit values after review. I will keep all values in the analysis. 
+boxplot.stats(data$Population)
+#no outliners are identified.
+
+#add a classifier column "ApprovalStatus" with 1 being loan applicaiton approved and 0 being application rejeted
+data$ApprovalStatus[data$ActionType %in% c(1,2,6,8)]<-1
+data$ApprovalStatus[data$ActionType %in% c(3,4,5,7)]<-0
+data$ApprovalStatus<-as.factor(data$ApprovalStatus)
+table(data$ApprovalStatus)
+
+#calculate correlation of social factors with approvalstatus.
+data_sc<-data[, c(10,11,12,13,14,15, 16,17,27,28,29,31,38)]
+summary(glm(ApprovalStatus ~ StateCode+CountyCode+ApplicantEthnicity+CoApplicantEthnicity+ApplicantRace1+CoApplicantRace1+ApplicantSex+CoApplicantSex, data = data_sc, family = binomial))
+#the result indicates correlations of all attributes to ApprovalStatus is significant. So keep all attributes.
+
+summary(glm(ApprovalStatus ~ Population+MinorityPopulationPercent+HUDMedianFamilyIncome+NumberOfOwner.occupiedUnits, data = data_sc, family = binomial))
+#the result indicates correlations of all attributes but Population to ApprovalStatus is significant. So remove Population from the dataset.
+data_sc<-data_sc[,-9]
+
+#calculate correalation of loan related factors with approvalstatus.
+data_loan<-data[, c(2,3,4,5,6,7,17,18,19,23,24,25,29,38)]
+summary(glm(ApprovalStatus~LoanType+PropertyType+LoanPurpose+Occupancy+Preapproval+PurchaserType+HOEPAStatus+LienStatus, data = data_loan, family = "binomial"))
+summary(glm(ApprovalStatus~LoanAmount000s+ApplicantIncome000s+rateSpread, data = data_loan, family = "binomial"))
+#the result indicate correlations of all attributes but PurchaserType, HOEPAStatus and rateSpread to ApprovalStatus is significant. So remove PurchaserType, HOEPAStatus and rateSpread from the datatset.
+data_loan<-data_loan[,-c(9,10,11)]
+
+
+#Feature selection
+chisq1<-chi.squared(ApprovalStatus~., data_sc)
+View(chisq1)
+full1<-glm(ApprovalStatus~.,data=data_sc, family = binomial())
+null1<-glm(ApprovalStatus~1,data=data_sc, family = binomial())
+step1<-step(null1, scope=list(lower=null1, upper=full1),data = data_sc, direction= "both", trace=TRUE)
+summary(stepF1)
+
+chisq2<-chi.squared(ApprovalStatus~., data_loan)
+View(chisq2)
+full2<-glm(ApprovalStatus~.,data=data_loan, family = binomial())
+null2<-glm(ApprovalStatus~1,data=data_loan, family = binomial())
+step2<-step(null2, scope=list(lower=null2, upper=full2),data = data_loan, direction= "both", trace=TRUE)
+summary(step2)
+
+#Model building
+table(data_sc$ApprovalStatus)
+table(data_loan$ApprovalStatus)
+#given the datasets are not balanced, apply SMOTE algorithm to generate artifical data to balance the datasets.
+data_sc_balanced<-ROSE(ApprovalStatus~., data = data_sc, seed=1)$data
+table(data_sc_balanced$ApprovalStatus)
+data_loan_balanced<-ROSE(ApprovalStatus~., data = data_loan, seed=2)$data
+table(data_loan_balanced$ApprovalStatus)
+#split the yelp dataset into training and test set.
+train_index_sc<-sample(1:nrow(data_sc_balanced), 0.7 * nrow(data_sc_balanced))
+train.set_sc<-data_sc[train_index_sc,]
+test.set_sc<-data_sc[-train_index_sc,]
+
+# remove the approvalstatus column from our training and test datasets.
+train.set_sc_new<-train.set_sc[-21]
+test.set_sc_new<-test.set_sc[-21]
+
+# store the labels from our training and test datasets.
+train_sc_labels<-train.set_sc$ApprovalStatus
+test_sc_labels<-test.set_sc$ApprovalStatus
+
+#GLM Modeling
+glm_model_sc<-glm(ApprovalStatus~.,train.set_sc, family = "binomial")
+summary(glm_model_sc)
+
+#Performance Evaluation: Confusion Matrix, Accuracy metrics, AUC
+predicted_sc<-predict(glm_model_sc, newdata = test.set_sc, interval = "prediction", type="response")
+predicted_V1<-ifelse(predicted_sc>=0.5, 1, 0)
+confusionMatrix_V1 <- table(actual = test.set_sc$ApprovalStatus, predicted_sc = predicted_V1)
+confusionMatrix_V1
+accuracy.meas(test.set_sc$ApprovalStatus, predicted = predicted_sc)
+roc.curve(test.set_sc$ApprovalStatus, predicted_sc, plotit = F)
+
+#Improve the model via cross validation
+set.seed(123)
+train.set_sc_df<-data.frame(train.set_sc)
+train.control<-trainControl(method = "repeatedcv", number = 10, repeats = 3)
+trained_sc_model<-train(ApprovalStatus~., data = train.set_sc, method = "lvq", trControl = train.control)
+trained_sc_model
+
+#split the yelp dataset into training and test set.
+train_index_loan<-sample(1:nrow(data_loan_balanced), 0.7 * nrow(data_loan_balanced))
+train.set_loan<-data_loan[train_index_loan,]
+test.set_loan<-data_loan[-train_index_loan,]
+
+# remove the approvalstatus column from our training and test datasets.
+train.set_loan_new<-train.set_loan[-12]
+test.set_loan_new<-test.set_loan[-12]
+
+# store the labels from our training and test datasets.
+train_loan_labels<-train.set_loan$ApprovalStatus
+test_loan_labels<-test.set_loan$ApprovalStatus
+
+#GLM Modeling
+glm_model_loan<-glm(ApprovalStatus~.,train.set_loan, family = "binomial")
+summary(glm_model_loan)
+
+#Performance Evaluation: Confusion Matrix, Accuracy metrics, AUC
+predicted_loan<-predict(glm_model_loan, newdata = test.set_loan_new, interval = "prediction", type="response")
+predicted_V2<-ifelse(predicted_loan>=0.5, 1, 0)
+confusionMatrix_V2 <- table(actual = test.set_loan$ApprovalStatus, predicted_loan = predicted_V2)
+confusionMatrix_V2
+accuracy.meas(test.set_loan$ApprovalStatus, predicted = predicted_loan)
+roc.curve(test.set_loan$ApprovalStatus, predicted_loan, plotit = F)
+
+#Improve the model via cross validation
+set.seed(456)
+train.set_loan_df<-data.frame(train.set_loan)
+trained_loan_model<-train(ApprovalStatus~., data = train.set_loan, method = "lvq", trControl = train.control)
+trained_loan_model
