@@ -137,5 +137,5 @@ roc.curve(test.set_loan$ApprovalStatus, predicted_loan, plotit = F)
 #Improve the model via cross validation
 set.seed(456)
 train.set_loan_df<-data.frame(train.set_loan)
-trained_loan_model<-train(ApprovalStatus~., data = train.set_loan, method = "lm", trControl = train.control)
+trained_loan_model<-train(ApprovalStatus~., data = train.set_loan, method = "lvq", trControl = train.control)
 trained_loan_model
