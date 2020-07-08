@@ -93,14 +93,7 @@ test_sc_labels<-test.set_sc$ApprovalStatus
 #GLM Modeling
 glm_model_sc<-glm(ApprovalStatus~.,train.set_sc, family = "binomial")
 summary(glm_model_sc)
-
-#Performance Evaluation: Confusion Matrix, Accuracy metrics, AUC
 predicted_sc<-predict(glm_model_sc, newdata = test.set_sc, interval = "prediction", type="response")
-predicted_V1<-ifelse(predicted_sc>=0.5, 1, 0)
-confusionMatrix_V1 <- table(actual = test.set_sc$ApprovalStatus, predicted_sc = predicted_V1)
-confusionMatrix_V1
-accuracy.meas(test.set_sc$ApprovalStatus, predicted = predicted_sc)
-roc.curve(test.set_sc$ApprovalStatus, predicted_sc, plotit = F)
 
 #Improve the model via cross validation
 set.seed(123)
@@ -108,6 +101,13 @@ train.set_sc_df<-data.frame(train.set_sc)
 train.control<-trainControl(method = "repeatedcv", number = 10, repeats = 3)
 trained_sc_model<-train(ApprovalStatus~., data = train.set_sc, method = "lvq", trControl = train.control)
 trained_sc_model
+
+#Performance Evaluation: Confusion Matrix, Accuracy metrics, AUC
+predicted_V1<-ifelse(predicted_sc>=0.5, 1, 0)
+confusionMatrix_V1 <- table(actual = test.set_sc$ApprovalStatus, predicted_sc = predicted_V1)
+confusionMatrix_V1
+accuracy.meas(test.set_sc$ApprovalStatus, predicted = predicted_sc)
+roc.curve(test.set_sc$ApprovalStatus, predicted_sc, plotit = F)
 
 #split the yelp dataset into training and test set.
 train_index_loan<-sample(1:nrow(data_loan_balanced), 0.7 * nrow(data_loan_balanced))
@@ -125,17 +125,17 @@ test_loan_labels<-test.set_loan$ApprovalStatus
 #GLM Modeling
 glm_model_loan<-glm(ApprovalStatus~.,train.set_loan, family = "binomial")
 summary(glm_model_loan)
-
-#Performance Evaluation: Confusion Matrix, Accuracy metrics, AUC
 predicted_loan<-predict(glm_model_loan, newdata = test.set_loan_new, interval = "prediction", type="response")
-predicted_V2<-ifelse(predicted_loan>=0.5, 1, 0)
-confusionMatrix_V2 <- table(actual = test.set_loan$ApprovalStatus, predicted_loan = predicted_V2)
-confusionMatrix_V2
-accuracy.meas(test.set_loan$ApprovalStatus, predicted = predicted_loan)
-roc.curve(test.set_loan$ApprovalStatus, predicted_loan, plotit = F)
 
 #Improve the model via cross validation
 set.seed(456)
 train.set_loan_df<-data.frame(train.set_loan)
 trained_loan_model<-train(ApprovalStatus~., data = train.set_loan, method = "lvq", trControl = train.control)
 trained_loan_model
+
+#Performance Evaluation: Confusion Matrix, Accuracy metrics, AUC
+predicted_V2<-ifelse(predicted_loan>=0.5, 1, 0)
+confusionMatrix_V2 <- table(actual = test.set_loan$ApprovalStatus, predicted_loan = predicted_V2)
+confusionMatrix_V2
+accuracy.meas(test.set_loan$ApprovalStatus, predicted = predicted_loan)
+roc.curve(test.set_loan$ApprovalStatus, predicted_loan, plotit = F)
