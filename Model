@@ -79,7 +79,7 @@ View(chisq1)
 full1<-glm(ApprovalStatus~.,data=data_sc, family = binomial())
 null1<-glm(ApprovalStatus~1,data=data_sc, family = binomial())
 step1<-step(null1, scope=list(lower=null1, upper=full1),data = data_sc, direction= "both", trace=TRUE)
-summary(stepF1)
+summary(step1)
 
 chisq2<-chi.squared(ApprovalStatus~., data_loan)
 View(chisq2)
