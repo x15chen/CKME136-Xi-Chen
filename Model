@@ -166,7 +166,6 @@ summary(glm_model)
 
 effect_plot(glm_model, pred = ApplicantRace1, interval = TRUE, plot.points = T)
 effect_plot(glm_model, pred = CoApplicantRace1, interval = TRUE, plot.points = T)
-effect_plot(glm_model, pred = ApplicantSex, interval = TRUE, plot.points = T)
 effect_plot(glm_model, pred = LoanPurpose, interval = TRUE, plot.points = T)
 effect_plot(glm_model, pred = ApplicantIncome000s, interval = TRUE, plot.points = T)
 effect_plot(glm_model, pred = LoanAmount000s, interval = TRUE, plot.points = T)
